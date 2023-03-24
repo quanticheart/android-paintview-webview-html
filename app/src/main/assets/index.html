@@ -1,0 +1,252 @@
+<style>
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0px;
+  border: 0;
+  overflow: hidden;
+  /*  Disable scrollbars */
+  display: block;
+  /* No floating content on sides */
+}
+
+#canvas_div {
+    text-align: center;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+canvas {
+  border: 1px solid #d0d0d0;
+  background: #f2f2f2;
+}
+
+#btns{
+    position:absolute;
+    margin:0 auto;
+    clear:left;
+    height:auto;
+    text-align:center;/* Add This*/
+    z-index: 10;
+}
+
+.button1 {
+  background-color: white;
+  color: black;
+  border: 2px solid #4CAF50; /* Green */
+border-radius: 8px;
+    padding: 5px 20px;
+    text-align: center;
+    -webkit-transition-duration: 0.4s;
+    transition-duration: 0.4s;
+
+    text-decoration: none;
+    font-size: 16px;
+    cursor: pointer;
+    transition-duration: 0.4s;
+}
+
+.button1:hover {
+  background-color: #4CAF50; /* Green */
+  color: white;
+}
+
+
+</style>
+
+<div id="canvas_div">
+
+    <div id="btns">
+
+        <button class="button1" onclick="javascript:clearArea();return false;">Clear Area</button>
+        <select class="button1" id="selWidth">
+            <option value="5">5px</option>
+            <option value="11">11px</option>
+            <option value="13" selected="selected">13px</option>
+            <option value="15">15px</option>
+        </select>
+
+        <select class="button1" id="selColor">
+            <option value="black">black</option>
+            <option value="blue" selected="selected">blue</option>
+            <option value="red">red</option>
+            <option value="green">green</option>
+            <option value="yellow">yellow</option>
+            <option value="gray">gray</option>
+        </select>
+
+        <button class="button1" onclick="print();">print</button>
+
+    </div>
+
+    <canvas id="canvas" style='position:absolute; left:0px; top:0px;'></canvas>
+
+
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const context = canvas.getContext('2d');
+let isDrawing = false;
+let x = 0;
+let y = 0;
+var offsetX;
+var offsetY;
+
+ // Start listening to resize events and draw canvas.
+  initialize();
+
+  function initialize() {
+    // Register an event listener to call the resizeCanvas() function
+    // each time the window is resized.
+    window.addEventListener('resize', resizeCanvas, false);
+    // Draw canvas border for the first time.
+    resizeCanvas();
+  }
+
+
+  // Runs each time the DOM window resize event fires.
+  // Resets the canvas dimensions to match window,
+  // then draws the new borders accordingly.
+  function resizeCanvas() {
+    context.canvas.width = window.innerWidth;
+    context.canvas.height = window.innerHeight;
+  }
+
+function startup() {
+  canvas.addEventListener('touchstart', handleStart);
+  canvas.addEventListener('touchend', handleEnd);
+  canvas.addEventListener('touchcancel', handleCancel);
+  canvas.addEventListener('touchmove', handleMove);
+  canvas.addEventListener('mousedown', (e) => {
+    x = e.offsetX;
+    y = e.offsetY;
+    isDrawing = true;
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (isDrawing) {
+      drawLine(context, x, y, e.offsetX, e.offsetY);
+      x = e.offsetX;
+      y = e.offsetY;
+    }
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (isDrawing) {
+      drawLine(context, x, y, e.offsetX, e.offsetY);
+      x = 0;
+      y = 0;
+      isDrawing = false;
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", startup);
+
+const ongoingTouches = [];
+
+function handleStart(evt) {
+  evt.preventDefault();
+  const touches = evt.changedTouches;
+  offsetX = canvas.getBoundingClientRect().left;
+  offsetY = canvas.getBoundingClientRect().top;
+  for (let i = 0; i < touches.length; i++) {
+    ongoingTouches.push(copyTouch(touches[i]));
+  }
+}
+
+function handleMove(evt) {
+  evt.preventDefault();
+  const touches = evt.changedTouches;
+  for (let i = 0; i < touches.length; i++) {
+    const color = document.getElementById('selColor').value;
+    const idx = ongoingTouchIndexById(touches[i].identifier);
+    if (idx >= 0) {
+      context.beginPath();
+      context.moveTo(ongoingTouches[idx].clientX - offsetX, ongoingTouches[idx].clientY - offsetY);
+      context.lineTo(touches[i].clientX - offsetX, touches[i].clientY - offsetY);
+      context.lineWidth = document.getElementById('selWidth').value;
+      context.strokeStyle = color;
+      context.lineJoin = "round";
+      context.closePath();
+      context.stroke();
+      ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+    }
+  }
+}
+
+function handleEnd(evt) {
+  evt.preventDefault();
+  const touches = evt.changedTouches;
+  for (let i = 0; i < touches.length; i++) {
+    const color = document.getElementById('selColor').value;
+    let idx = ongoingTouchIndexById(touches[i].identifier);
+    if (idx >= 0) {
+      context.lineWidth = document.getElementById('selWidth').value;
+      context.fillStyle = color;
+      ongoingTouches.splice(idx, 1);  // remove it; we're done
+    }
+  }
+}
+
+function handleCancel(evt) {
+  evt.preventDefault();
+  const touches = evt.changedTouches;
+  for (let i = 0; i < touches.length; i++) {
+    let idx = ongoingTouchIndexById(touches[i].identifier);
+    ongoingTouches.splice(idx, 1);  // remove it; we're done
+  }
+}
+
+function copyTouch({ identifier, clientX, clientY }) {
+  return { identifier, clientX, clientY };
+}
+
+function ongoingTouchIndexById(idToFind) {
+  for (let i = 0; i < ongoingTouches.length; i++) {
+    const id = ongoingTouches[i].identifier;
+    if (id === idToFind) {
+      return i;
+    }
+  }
+  return -1;    // not found
+}
+
+function drawLine(context, x1, y1, x2, y2) {
+  context.beginPath();
+  context.strokeStyle = document.getElementById('selColor').value;
+  context.lineWidth = document.getElementById('selWidth').value;
+  context.lineJoin = "round";
+  context.moveTo(x1, y1);
+  context.lineTo(x2, y2);
+  context.closePath();
+  context.stroke();
+}
+
+function clearArea() {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+}
+
+function print(){
+		var myImageData = context.getImageData(0, 0, canvas.width, canvas.height);
+		convertImageToBase64()
+		getFromAndroid()
+}
+
+    function getFromAndroid() {
+        myVar = Android.wWebViewCallFunction();
+        alert(myVar);
+    }
+
+    function convertImageToBase64() {
+  Android.data(canvas.toDataURL());
+}
+
+ function enable(msg) {
+  alert(msg);
+}
+</script>
